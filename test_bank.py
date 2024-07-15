@@ -2,7 +2,7 @@ import unittest
 import bank
 
 
-class TestHello(unittest.TestCase):
+class TestBank(unittest.TestCase):
     def test_display(self):
         acc = bank.bank(0, "Patrick", 00000)
         self.assertEqual(acc.display(), 0)
@@ -15,7 +15,7 @@ class TestHello(unittest.TestCase):
     def test_deposit(self):
         acc = bank.bank(0, "Patrick", 00000)
         acc.deposit(10)
-        self.assertEqual(acc.display(), 0)
+        self.assertEqual(acc.display(), 10)
 
     # def test_sin(self):
     #     self.assertEqual(hello.sin(0), 0)
