@@ -150,8 +150,8 @@ def calculate_auv2_acceleration(
 
     Parameters:
     T (np.ndarray): Thrust magnitudes from four thrusters (N)
-    alpha (float): Angle of the thrusters relative to the AUV's body axis (degrees)
-    theta (float): Orientation angle of the AUV (degrees)
+    alpha (float): Angle of the thrusters relative to the AUV's body axis (radians)
+    theta (float): Orientation angle of the AUV (radians)
     mass (float): Mass of the AUV (kg), default is 100 kg
 
     Returns:
@@ -159,42 +159,47 @@ def calculate_auv2_acceleration(
     """
     if (
         not isinstance(T, np.ndarray)
+        or len(T) != 4
         or not all(t > 0 for t in T)
         or alpha < 0
         or theta < 0
         or mass <= 0
     ):
         raise ValueError(
-            "Thrust values must be positive numbers, and angles and mass must be non-negative."
+            "Thrust values must be positive numbers, angles must be non-negative, and mass must be positive."
         )
+
     alpha = np.radians(alpha)
     theta = np.radians(theta)
     ax = (
-        np.sin(alpha + theta) * T[0]
-        + np.sin(theta - alpha) * T[1]
-        + np.sin(np.pi - theta - alpha) * T[2]
-        + np.sin(np.pi - theta + alpha) * T[3]
+        (np.sin(alpha + theta) * T[0])
+        + (np.sin(theta - alpha) * T[1])
+        + (np.sin(np.pi - theta - alpha) * T[2])
+        + (np.sin(np.pi - theta + alpha) * T[3])
     ) / mass
+
     ay = (
-        np.cos(alpha + theta) * T[0]
-        + np.cos(theta - alpha) * T[1]
-        + np.cos(np.pi - theta - alpha) * T[2]
-        + np.cos(np.pi - theta + alpha) * T[3]
+        (np.cos(alpha + theta) * T[0])
+        + (np.cos(theta - alpha) * T[1])
+        + (np.cos(np.pi - theta - alpha) * T[2])
+        + (np.cos(np.pi - theta + alpha) * T[3])
     ) / mass
+
     return np.sqrt(ax**2 + ay**2)
 
 
 def calculate_auv2_angular_acceleration(
-    T: np.ndarray, alpha: float, L: float, theta: float, inertia: float = 100
+    T: np.ndarray, alpha: float, L: float, l: float, theta: float, inertia: float = 100
 ) -> float:
     """
     Calculate the angular acceleration of a multi-thruster AUV.
 
     Parameters:
     T (np.ndarray): Thrust magnitudes from four thrusters (N)
-    alpha (float): Angle of the thrusters relative to the AUV's body axis (degrees)
-    L (float): Distance between the thrusters (m)
-    theta (float): Orientation angle of the AUV (degrees)
+    alpha (float): Angle of the thrusters relative to the AUV's body axis (radians)
+    L (float): Longitudinal distance from the center of mass to the thrusters (m)
+    l (float): Lateral distance from the center of mass to the thrusters (m)
+    theta (float): Orientation angle of the AUV (radians)
     inertia (float): Moment of inertia of the AUV (kg·m^2), default is 100 kg·m^2
 
     Returns:
@@ -202,24 +207,38 @@ def calculate_auv2_angular_acceleration(
     """
     if (
         not isinstance(T, np.ndarray)
+        or len(T) != 4
         or not all(t > 0 for t in T)
         or alpha < 0
         or L <= 0
+        or l <= 0
         or theta < 0
         or inertia <= 0
     ):
         raise ValueError(
             "Thrust values must be positive numbers, angles must be non-negative, and distances and inertia must be positive."
         )
+
     alpha = np.radians(alpha)
     theta = np.radians(theta)
-    torque = L * (
-        np.sin(alpha + theta) * T[0]
-        + np.sin(theta - alpha) * T[1]
-        + np.sin(np.pi - theta - alpha) * T[2]
-        + np.sin(np.pi - theta + alpha) * T[3]
+
+    torque_longitudinal = L * (
+        (np.sin(alpha + theta) * T[0])
+        + (np.sin(theta - alpha) * T[1])
+        + (np.sin(np.pi - theta - alpha) * T[2])
+        + (np.sin(np.pi - theta + alpha) * T[3])
     )
-    return torque / inertia
+
+    torque_lateral = l * (
+        (np.cos(alpha + theta) * T[0])
+        + (np.cos(theta - alpha) * T[1])
+        + (np.cos(np.pi - theta - alpha) * T[2])
+        + (np.cos(np.pi - theta + alpha) * T[3])
+    )
+
+    total_torque = torque_longitudinal + torque_lateral
+
+    return total_torque / inertia
 
 
 def simulate_auv2_motion(
@@ -241,8 +260,8 @@ def simulate_auv2_motion(
     Parameters:
     T (np.ndarray): Thrust magnitudes from four thrusters (N)
     alpha (float): Angle of the thrusters relative to the AUV's body axis (radians)
-    L (float): Distance from the center of mass of the AUV to the thrusters (m)
-    l (float): Distance from the center of mass of the AUV to the thrusters (m)
+    L (float): Longitudinal distance from the center of mass of the AUV to the thrusters (m)
+    l (float): Lateral distance from the center of mass of the AUV to the thrusters (m)
     mass (float): Mass of the AUV (kg), default is 100 kg
     inertia (float): Moment of inertia of the AUV (kg·m^2), default is 100 kg·m^2
     dt (float): Time step for the simulation (s), default is 0.1 s
@@ -256,7 +275,8 @@ def simulate_auv2_motion(
     """
     if (
         not isinstance(T, np.ndarray)
-        or not all(t > 0 for t in T)
+        or len(T) != 4
+        or not all(t >= 0 for t in T)
         or alpha < 0
         or L <= 0
         or l <= 0
@@ -266,7 +286,7 @@ def simulate_auv2_motion(
         or t_final <= 0
     ):
         raise ValueError(
-            "Thrust values must be positive numbers, angles must be non-negative, and distances, mass, inertia, and time values must be positive."
+            "Thrust values must be non-negative numbers, angles must be non-negative, and distances, mass, inertia, and time values must be positive."
         )
 
     n_steps = int(t_final / dt)
@@ -283,9 +303,7 @@ def simulate_auv2_motion(
 
     for i in range(1, n_steps):
         acc = calculate_auv2_acceleration(T, alpha, theta[i - 1], mass)
-        ang_acc = calculate_auv2_angular_acceleration(
-            T, alpha, L, theta[i - 1], inertia
-        )
+        ang_acc = calculate_auv2_angular_acceleration(T, alpha, L, l, theta[i - 1], inertia)
 
         v[i] = v[i - 1] + acc * dt
         omega[i] = omega[i - 1] + ang_acc * dt
@@ -296,7 +314,6 @@ def simulate_auv2_motion(
         a[i] = acc
 
     return t, x, y, theta, v, omega, a
-
 
 def plot_auv2_motion(
     t: np.ndarray,
